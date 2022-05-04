@@ -11,11 +11,57 @@ use std::{
     sync::{atomic::AtomicBool, Arc, Mutex},
     time::Instant,
 };
+use std::fmt::Formatter;
+
+pub(crate) trait Socket {
+    fn connect(&self) -> Result<()>;
+    fn is_connected(&self) -> Result<bool>;
+    fn emit(&self, packet: Packet) -> Result<()>;
+    fn poll(&self) -> Result<Option<Packet>>;
+    fn close_connection(&self) -> Result<()>;
+    fn handle_ping(&self) -> Result<()>;
+    fn handle_pong(&self) -> Result<()>;
+
+    fn on_close(&self) -> OptionalCallback<()> { OptionalCallback::default() }
+    fn on_data(&self) -> OptionalCallback<Bytes> { OptionalCallback::default() }
+    fn on_error(&self) -> OptionalCallback<String> { OptionalCallback::default() }
+    fn on_open(&self) -> OptionalCallback<()> { OptionalCallback::default() }
+    fn on_packet(&self) -> OptionalCallback<Packet> { OptionalCallback::default() }
+
+    fn disconnect(&self) -> Result<()> {
+        if let Some(on_close) = self.on_close().as_ref() {
+            spawn_scoped!(on_close(()));
+        }
+
+        self.emit(Packet::new(PacketId::Close, Bytes::new()))?;
+
+        return self.close_connection();
+    }
+
+    /// Calls the error callback with a given message.
+    #[inline]
+    fn call_error_callback(&self, text: String) {
+        if let Some(function) = self.on_error().as_ref() {
+            spawn_scoped!(function(text));
+        }
+    }
+
+    fn handle_packet(&self, packet: Packet) {
+        if let Some(on_packet) = self.on_packet().as_ref() {
+            spawn_scoped!(on_packet(packet));
+        }
+    }
+
+    fn handle_data(&self, data: Bytes) {
+        if let Some(on_data) = self.on_data().as_ref() {
+            spawn_scoped!(on_data(data));
+        }
+    }
+}
 
 /// An `engine.io` socket which manages a connection with the server and allows
 /// it to register common callbacks.
-#[derive(Clone)]
-pub struct Socket {
+pub struct V4Socket {
     transport: Arc<TransportType>,
     on_close: OptionalCallback<()>,
     on_data: OptionalCallback<Bytes>,
@@ -30,7 +76,7 @@ pub struct Socket {
     remaining_packets: Arc<RwLock<Option<crate::packet::IntoIter>>>,
 }
 
-impl Socket {
+impl V4Socket {
     pub(crate) fn new(
         transport: TransportType,
         handshake: HandshakePacket,
@@ -40,7 +86,7 @@ impl Socket {
         on_open: OptionalCallback<()>,
         on_packet: OptionalCallback<Packet>,
     ) -> Self {
-        Socket {
+        V4Socket {
             on_close,
             on_data,
             on_error,
@@ -54,10 +100,12 @@ impl Socket {
             remaining_packets: Arc::new(RwLock::new(None)),
         }
     }
+}
 
+impl Socket for V4Socket {
     /// Opens the connection to a specified server. The first Pong packet is sent
     /// to the server to trigger the Ping-cycle.
-    pub fn connect(&self) -> Result<()> {
+    fn connect(&self) -> Result<()> {
         // SAFETY: Has valid handshake due to type
         self.connected.store(true, Ordering::Release);
 
@@ -74,20 +122,12 @@ impl Socket {
         Ok(())
     }
 
-    pub fn disconnect(&self) -> Result<()> {
-        if let Some(on_close) = self.on_close.as_ref() {
-            spawn_scoped!(on_close(()));
-        }
-
-        self.emit(Packet::new(PacketId::Close, Bytes::new()))?;
-
-        self.connected.store(false, Ordering::Release);
-
-        Ok(())
+    fn is_connected(&self) -> Result<bool> {
+        Ok(self.connected.load(Ordering::Acquire))
     }
 
     /// Sends a packet to the server.
-    pub fn emit(&self, packet: Packet) -> Result<()> {
+    fn emit(&self, packet: Packet) -> Result<()> {
         if !self.connected.load(Ordering::Acquire) {
             let error = Error::IllegalActionBeforeOpen();
             self.call_error_callback(format!("{}", error));
@@ -113,7 +153,7 @@ impl Socket {
     }
 
     /// Polls for next payload
-    pub(crate) fn poll(&self) -> Result<Option<Packet>> {
+    fn poll(&self) -> Result<Option<Packet>> {
         loop {
             if self.connected.load(Ordering::Acquire) {
                 if self.remaining_packets.read()?.is_some() {
@@ -146,47 +186,48 @@ impl Socket {
         }
     }
 
-    /// Calls the error callback with a given message.
-    #[inline]
-    fn call_error_callback(&self, text: String) {
-        if let Some(function) = self.on_error.as_ref() {
-            spawn_scoped!(function(text));
-        }
-    }
-
-    // Check if the underlying transport client is connected.
-    pub(crate) fn is_connected(&self) -> Result<bool> {
-        Ok(self.connected.load(Ordering::Acquire))
-    }
-
-    pub(crate) fn pinged(&self) -> Result<()> {
-        *self.last_ping.lock()? = Instant::now();
-        Ok(())
-    }
-
-    pub(crate) fn handle_packet(&self, packet: Packet) {
-        if let Some(on_packet) = self.on_packet.as_ref() {
-            spawn_scoped!(on_packet(packet));
-        }
-    }
-
-    pub(crate) fn handle_data(&self, data: Bytes) {
-        if let Some(on_data) = self.on_data.as_ref() {
-            spawn_scoped!(on_data(data));
-        }
-    }
-
-    pub(crate) fn handle_close(&self) {
-        if let Some(on_close) = self.on_close.as_ref() {
-            spawn_scoped!(on_close(()));
+    fn close_connection(&self) -> Result<()> {
+        if let Some(on_close) = self.on_close().as_ref() {
+            spawn_scoped!(on_close);
         }
 
         self.connected.store(false, Ordering::Release);
+
+        Ok(())
+    }
+
+    fn handle_ping(&self) -> Result<()> {
+        *self.last_ping.lock()? = Instant::now();
+        self.emit(Packet::new(PacketId::Pong, Bytes::new()))
+    }
+
+    fn handle_pong(&self) -> Result<()> {
+        unreachable!("Should never be called, because in engine.io protocol v4 pong packets are only sent by the client")
+    }
+
+    fn on_close(&self) -> OptionalCallback<()> {
+        self.on_close.clone()
+    }
+
+    fn on_data(&self) -> OptionalCallback<Bytes> {
+        self.on_data.clone()
+    }
+
+    fn on_error(&self) -> OptionalCallback<String> {
+        self.on_error.clone()
+    }
+
+    fn on_open(&self) -> OptionalCallback<()> {
+        self.on_open.clone()
+    }
+
+    fn on_packet(&self) -> OptionalCallback<Packet> {
+        self.on_packet.clone()
     }
 }
 
 #[cfg_attr(tarpaulin, ignore)]
-impl Debug for Socket {
+impl Debug for V4Socket {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!(
             "EngineSocket(transport: {:?}, on_error: {:?}, on_open: {:?}, on_close: {:?}, on_packet: {:?}, on_data: {:?}, connected: {:?}, last_ping: {:?}, last_pong: {:?}, connection_data: {:?})",
