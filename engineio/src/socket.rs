@@ -1,17 +1,18 @@
-use crate::callback::OptionalCallback;
-use crate::transport::TransportType;
-
-use crate::error::{Error, Result};
-use crate::packet::{HandshakePacket, Packet, PacketId, Payload};
-use bytes::Bytes;
-use std::convert::TryFrom;
-use std::sync::RwLock;
 use std::{fmt::Debug, sync::atomic::Ordering};
 use std::{
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{Arc, atomic::AtomicBool, Mutex},
     time::Instant,
 };
+use std::convert::TryFrom;
 use std::fmt::Formatter;
+use std::sync::RwLock;
+
+use bytes::Bytes;
+
+use crate::callback::OptionalCallback;
+use crate::error::{Error, Result};
+use crate::packet::{HandshakePacket, Packet, PacketId, Payload};
+use crate::transport::TransportType;
 
 pub(crate) trait Socket {
     fn connect(&self) -> Result<()>;

@@ -1,15 +1,18 @@
+use std::{fmt::Debug, sync::atomic::Ordering};
+use std::convert::TryFrom;
+use std::sync::{Arc, atomic::AtomicBool};
+
+use bytes::Bytes;
+
+use rust_engineio::{Client as EngineClient, Packet as EnginePacket, PacketId as EnginePacketId};
+
 use crate::error::{Error, Result};
 use crate::packet::{Packet, PacketId};
-use bytes::Bytes;
-use rust_engineio::{Client as EngineClient, Packet as EnginePacket, PacketId as EnginePacketId};
-use std::convert::TryFrom;
-use std::sync::{atomic::AtomicBool, Arc};
-use std::{fmt::Debug, sync::atomic::Ordering};
 
 use super::{event::Event, payload::Payload};
 
 /// Handles communication in the `socket.io` protocol.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct Socket {
     //TODO: 0.4.0 refactor this
     engine_client: Arc<EngineClient>,
