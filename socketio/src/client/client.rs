@@ -31,7 +31,7 @@ pub struct Ack {
 #[derive(Clone)]
 pub struct Client {
     /// The inner socket client to delegate the methods to.
-    socket: InnerSocket,
+    socket: Arc<InnerSocket>,
     on: Arc<RwLock<HashMap<Event, Callback<SocketCallback>>>>,
     on_any: Arc<RwLock<Option<Callback<SocketAnyCallback>>>>,
     outstanding_acks: Arc<RwLock<Vec<Ack>>>,
@@ -47,7 +47,7 @@ impl Client {
     /// `"/"` is taken.
     /// ```
     pub(crate) fn new<T: Into<String>>(
-        socket: InnerSocket,
+        socket: Arc<InnerSocket>,
         namespace: T,
         on: HashMap<Event, Callback<SocketCallback>>,
         on_any: Option<Callback<SocketAnyCallback>>,

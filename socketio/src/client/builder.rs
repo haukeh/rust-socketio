@@ -9,6 +9,7 @@ use url::Url;
 use crate::client::callback::{SocketAnyCallback, SocketCallback};
 use crate::error::{Error, Result};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::thread;
 
 use crate::socket::Socket as InnerSocket;
@@ -309,7 +310,7 @@ impl ClientBuilder {
             TransportType::WebsocketUpgrade => builder.build_websocket_with_upgrade()?,
         };
 
-        let inner_socket = InnerSocket::new(engine_client)?;
+        let inner_socket = Arc::new(InnerSocket::new(engine_client)?);
 
         let socket = Client::new(
             inner_socket,
@@ -318,6 +319,7 @@ impl ClientBuilder {
             self.on_any,
             self.auth,
         )?;
+
         socket.connect()?;
 
         Ok(socket)
