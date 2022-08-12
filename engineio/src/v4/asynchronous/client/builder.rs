@@ -5,15 +5,15 @@ use crate::v4::{
         callback::OptionalCallback,
         transport::AsyncTransport,
     },
-    header::HeaderMap,
-    packet::HandshakePacket,
-    Error, Packet, ENGINE_IO_VERSION,
+    ENGINE_IO_VERSION,
+    Error, Packet, packet::HandshakePacket,
 };
 use crate::error::Result;
 use bytes::Bytes;
 use futures_util::{future::BoxFuture, StreamExt};
 use native_tls::TlsConnector;
 use url::Url;
+use crate::common::header::HeaderMap;
 
 use super::Client;
 

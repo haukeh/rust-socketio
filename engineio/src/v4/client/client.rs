@@ -3,7 +3,7 @@ use crate::v4::callback::OptionalCallback;
 use crate::v4::transport::Transport;
 
 use crate::error::{Error, Result};
-use crate::v4::header::HeaderMap;
+use crate::common::header::HeaderMap;
 use crate::v4::packet::{HandshakePacket, Packet, PacketId};
 use crate::v4::transports::{PollingTransport, WebsocketSecureTransport, WebsocketTransport};
 use crate::v4::ENGINE_IO_VERSION;

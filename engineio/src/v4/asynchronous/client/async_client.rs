@@ -83,12 +83,13 @@ impl Debug for Client {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::v4::{asynchronous::ClientBuilder, header::HeaderMap, packet::PacketId, Error, packet::Packet};
+    use crate::v4::{asynchronous::ClientBuilder, Error, packet::Packet, packet::PacketId};
     use bytes::Bytes;
     use futures_util::StreamExt;
     use native_tls::TlsConnector;
     use url::Url;
     use reqwest::header::HOST;
+    use crate::common::header::HeaderMap;
     use crate::v4::test as test_utils;
 
     #[tokio::test]
