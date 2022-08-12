@@ -1,10 +1,12 @@
 use crate::{
-    asynchronous::{
-        async_transports::WebsocketSecureTransport as AsyncWebsocketSecureTransport,
-        transport::AsyncTransport,
+    v4::{
+        asynchronous::{
+            async_transports::WebsocketSecureTransport as AsyncWebsocketSecureTransport,
+            transport::AsyncTransport,
+        },
+        transport::Transport,
     },
     error::Result,
-    transport::Transport,
     Error,
 };
 use bytes::Bytes;
@@ -94,15 +96,17 @@ impl std::fmt::Debug for WebsocketSecureTransport {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ENGINE_IO_VERSION;
+    use crate::v4::ENGINE_IO_VERSION;
     use std::str::FromStr;
+    use crate::v4::test as test_utils;
+
     fn new() -> Result<WebsocketSecureTransport> {
-        let url = crate::test::engine_io_server_secure()?.to_string()
+        let url = test_utils::engine_io_server_secure()?.to_string()
             + "engine.io/?EIO="
             + &ENGINE_IO_VERSION.to_string();
         WebsocketSecureTransport::new(
             Url::from_str(&url[..])?,
-            Some(crate::test::tls_connector()?),
+            Some(test_utils::tls_connector()?),
             None,
         )
     }
@@ -110,7 +114,7 @@ mod test {
     #[test]
     fn websocket_secure_transport_base_url() -> Result<()> {
         let transport = new()?;
-        let mut url = crate::test::engine_io_server_secure()?;
+        let mut url = test_utils::engine_io_server_secure()?;
         url.set_path("/engine.io/");
         url.query_pairs_mut()
             .append_pair("EIO", &ENGINE_IO_VERSION.to_string())

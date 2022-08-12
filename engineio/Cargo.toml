@@ -49,5 +49,7 @@ harness = false
 bench = false
 
 [features]
-default = ["async"]
+default = ["async", "v4"]
 async = []
+v4 = []
+v3 = []

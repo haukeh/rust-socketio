@@ -1,15 +1,15 @@
-use crate::{
+use crate::v4::{
     asynchronous::{
         async_socket::Socket as InnerSocket,
         async_transports::{PollingTransport, WebsocketSecureTransport, WebsocketTransport},
         callback::OptionalCallback,
         transport::AsyncTransport,
     },
-    error::Result,
     header::HeaderMap,
     packet::HandshakePacket,
     Error, Packet, ENGINE_IO_VERSION,
 };
+use crate::error::Result;
 use bytes::Bytes;
 use futures_util::{future::BoxFuture, StreamExt};
 use native_tls::TlsConnector;
@@ -67,8 +67,8 @@ impl ClientBuilder {
 
     /// Registers the `on_close` callback.
     pub fn on_close<T>(mut self, callback: T) -> Self
-    where
-        T: 'static + Send + Sync + Fn(()) -> BoxFuture<'static, ()>,
+        where
+            T: 'static + Send + Sync + Fn(()) -> BoxFuture<'static, ()>,
     {
         self.on_close = OptionalCallback::new(callback);
         self
@@ -76,8 +76,8 @@ impl ClientBuilder {
 
     /// Registers the `on_data` callback.
     pub fn on_data<T>(mut self, callback: T) -> Self
-    where
-        T: 'static + Send + Sync + Fn(Bytes) -> BoxFuture<'static, ()>,
+        where
+            T: 'static + Send + Sync + Fn(Bytes) -> BoxFuture<'static, ()>,
     {
         self.on_data = OptionalCallback::new(callback);
         self
@@ -85,8 +85,8 @@ impl ClientBuilder {
 
     /// Registers the `on_error` callback.
     pub fn on_error<T>(mut self, callback: T) -> Self
-    where
-        T: 'static + Send + Sync + Fn(String) -> BoxFuture<'static, ()>,
+        where
+            T: 'static + Send + Sync + Fn(String) -> BoxFuture<'static, ()>,
     {
         self.on_error = OptionalCallback::new(callback);
         self
@@ -94,8 +94,8 @@ impl ClientBuilder {
 
     /// Registers the `on_open` callback.
     pub fn on_open<T>(mut self, callback: T) -> Self
-    where
-        T: 'static + Send + Sync + Fn(()) -> BoxFuture<'static, ()>,
+        where
+            T: 'static + Send + Sync + Fn(()) -> BoxFuture<'static, ()>,
     {
         self.on_open = OptionalCallback::new(callback);
         self
@@ -103,8 +103,8 @@ impl ClientBuilder {
 
     /// Registers the `on_packet` callback.
     pub fn on_packet<T>(mut self, callback: T) -> Self
-    where
-        T: 'static + Send + Sync + Fn(Packet) -> BoxFuture<'static, ()>,
+        where
+            T: 'static + Send + Sync + Fn(Packet) -> BoxFuture<'static, ()>,
     {
         self.on_packet = OptionalCallback::new(callback);
         self
@@ -234,7 +234,7 @@ impl ClientBuilder {
                     self.tls_config.clone(),
                     headers,
                 )
-                .await?;
+                    .await?;
 
                 if self.handshake.is_some() {
                     transport.upgrade().await?;

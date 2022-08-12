@@ -1,8 +1,8 @@
-use crate::callback::OptionalCallback;
-use crate::transport::TransportType;
+use crate::v4::callback::OptionalCallback;
+use crate::v4::transport::TransportType;
 
 use crate::error::{Error, Result};
-use crate::packet::{HandshakePacket, Packet, PacketId, Payload};
+use crate::v4::packet::{HandshakePacket, Packet, PacketId, Payload};
 use bytes::Bytes;
 use std::convert::TryFrom;
 use std::sync::RwLock;
@@ -27,7 +27,7 @@ pub struct Socket {
     last_pong: Arc<Mutex<Instant>>,
     connection_data: Arc<HandshakePacket>,
     /// Since we get packets in payloads it's possible to have a state where only some of the packets have been consumed.
-    remaining_packets: Arc<RwLock<Option<crate::packet::IntoIter>>>,
+    remaining_packets: Arc<RwLock<Option<crate::v4::packet::IntoIter>>>,
 }
 
 impl Socket {

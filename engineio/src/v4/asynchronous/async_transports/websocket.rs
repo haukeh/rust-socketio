@@ -2,42 +2,35 @@ use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::asynchronous::transport::AsyncTransport;
+use crate::v4::asynchronous::transport::AsyncTransport;
 use crate::error::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures_util::stream::StreamExt;
 use futures_util::Stream;
-use futures_util::StreamExt;
 use http::HeaderMap;
-use native_tls::TlsConnector;
 use tokio::sync::RwLock;
-use tokio_tungstenite::connect_async_tls_with_config;
-use tokio_tungstenite::Connector;
+use tokio_tungstenite::connect_async;
 use tungstenite::client::IntoClientRequest;
 use url::Url;
 
 use super::websocket_general::AsyncWebsocketGeneralTransport;
 
 /// An asynchronous websocket transport type.
-/// This type only allows for secure websocket
-/// connections ("wss://").
+/// This type only allows for plain websocket
+/// connections ("ws://").
 #[derive(Clone)]
-pub struct WebsocketSecureTransport {
+pub struct WebsocketTransport {
     inner: AsyncWebsocketGeneralTransport,
     base_url: Arc<RwLock<Url>>,
 }
 
-impl WebsocketSecureTransport {
-    /// Creates a new instance over a request that might hold additional headers, a possible
-    /// Tls connector and an URL.
-    pub(crate) async fn new(
-        base_url: Url,
-        tls_config: Option<TlsConnector>,
-        headers: Option<HeaderMap>,
-    ) -> Result<Self> {
+impl WebsocketTransport {
+    /// Creates a new instance over a request that might hold additional headers and an URL.
+    pub async fn new(base_url: Url, headers: Option<HeaderMap>) -> Result<Self> {
         let mut url = base_url;
         url.query_pairs_mut().append_pair("transport", "websocket");
-        url.set_scheme("wss").unwrap();
+        url.set_scheme("ws").unwrap();
 
         let mut req = url.clone().into_client_request()?;
         if let Some(map) = headers {
@@ -45,13 +38,11 @@ impl WebsocketSecureTransport {
             req.headers_mut().extend(map);
         }
 
-        let (ws_stream, _) =
-            connect_async_tls_with_config(req, None, tls_config.map(Connector::NativeTls)).await?;
-
+        let (ws_stream, _) = connect_async(req).await?;
         let (sen, rec) = ws_stream.split();
-        let inner = AsyncWebsocketGeneralTransport::new(sen, rec).await;
 
-        Ok(WebsocketSecureTransport {
+        let inner = AsyncWebsocketGeneralTransport::new(sen, rec).await;
+        Ok(WebsocketTransport {
             inner,
             base_url: Arc::new(RwLock::new(url)),
         })
@@ -64,19 +55,8 @@ impl WebsocketSecureTransport {
     }
 }
 
-impl Stream for WebsocketSecureTransport {
-    type Item = Result<Bytes>;
-
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.inner.poll_next_unpin(cx)
-    }
-}
-
 #[async_trait]
-impl AsyncTransport for WebsocketSecureTransport {
+impl AsyncTransport for WebsocketTransport {
     async fn emit(&self, data: Bytes, is_binary_att: bool) -> Result<()> {
         self.inner.emit(data, is_binary_att).await
     }
@@ -93,15 +73,26 @@ impl AsyncTransport for WebsocketSecureTransport {
         {
             url.query_pairs_mut().append_pair("transport", "websocket");
         }
-        url.set_scheme("wss").unwrap();
+        url.set_scheme("ws").unwrap();
         *self.base_url.write().await = url;
         Ok(())
     }
 }
 
-impl Debug for WebsocketSecureTransport {
+impl Stream for WebsocketTransport {
+    type Item = Result<Bytes>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        self.inner.poll_next_unpin(cx)
+    }
+}
+
+impl Debug for WebsocketTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AsyncWebsocketSecureTransport")
+        f.debug_struct("AsyncWebsocketTransport")
             .field(
                 "base_url",
                 &self
@@ -116,37 +107,32 @@ impl Debug for WebsocketSecureTransport {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ENGINE_IO_VERSION;
+    use crate::v4::ENGINE_IO_VERSION;
     use std::str::FromStr;
 
-    async fn new() -> Result<WebsocketSecureTransport> {
-        let url = crate::test::engine_io_server_secure()?.to_string()
+    async fn new() -> Result<WebsocketTransport> {
+        let url = crate::v4::test::engine_io_server()?.to_string()
             + "engine.io/?EIO="
             + &ENGINE_IO_VERSION.to_string();
-        WebsocketSecureTransport::new(
-            Url::from_str(&url[..])?,
-            Some(crate::test::tls_connector()?),
-            None,
-        )
-        .await
+        WebsocketTransport::new(Url::from_str(&url[..])?, None).await
     }
 
     #[tokio::test]
-    async fn websocket_secure_transport_base_url() -> Result<()> {
+    async fn websocket_transport_base_url() -> Result<()> {
         let transport = new().await?;
-        let mut url = crate::test::engine_io_server_secure()?;
+        let mut url = crate::v4::test::engine_io_server()?;
         url.set_path("/engine.io/");
         url.query_pairs_mut()
             .append_pair("EIO", &ENGINE_IO_VERSION.to_string())
             .append_pair("transport", "websocket");
-        url.set_scheme("wss").unwrap();
+        url.set_scheme("ws").unwrap();
         assert_eq!(transport.base_url().await?.to_string(), url.to_string());
         transport
             .set_base_url(reqwest::Url::parse("https://127.0.0.1")?)
             .await?;
         assert_eq!(
             transport.base_url().await?.to_string(),
-            "wss://127.0.0.1/?transport=websocket"
+            "ws://127.0.0.1/?transport=websocket"
         );
         assert_ne!(transport.base_url().await?.to_string(), url.to_string());
 
@@ -157,7 +143,7 @@ mod test {
             .await?;
         assert_eq!(
             transport.base_url().await?.to_string(),
-            "wss://127.0.0.1/?transport=websocket"
+            "ws://127.0.0.1/?transport=websocket"
         );
         assert_ne!(transport.base_url().await?.to_string(), url.to_string());
         Ok(())
@@ -165,14 +151,16 @@ mod test {
 
     #[tokio::test]
     async fn websocket_secure_debug() -> Result<()> {
-        let transport = new().await?;
+        let mut transport = new().await?;
         assert_eq!(
             format!("{:?}", transport),
             format!(
-                "AsyncWebsocketSecureTransport {{ base_url: {:?} }}",
+                "AsyncWebsocketTransport {{ base_url: {:?} }}",
                 transport.base_url().await?.to_string()
             )
         );
+        println!("{:?}", transport.next().await.unwrap());
+        println!("{:?}", transport.next().await.unwrap());
         Ok(())
     }
 }

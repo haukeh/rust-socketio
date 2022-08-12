@@ -2,7 +2,7 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
-use crate::Packet;
+use crate::v4::Packet;
 
 /// Internal type, provides a way to store futures and return them in a boxed manner.
 pub(crate) type DynAsyncCallback<I> = dyn 'static + Send + Sync + Fn(I) -> BoxFuture<'static, ()>;

@@ -1,4 +1,4 @@
-use crate::Packet;
+use crate::v4::Packet;
 use bytes::Bytes;
 use std::fmt::Debug;
 use std::ops::Deref;

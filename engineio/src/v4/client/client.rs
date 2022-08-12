@@ -1,12 +1,12 @@
 use super::super::socket::Socket as InnerSocket;
-use crate::callback::OptionalCallback;
-use crate::transport::Transport;
+use crate::v4::callback::OptionalCallback;
+use crate::v4::transport::Transport;
 
 use crate::error::{Error, Result};
-use crate::header::HeaderMap;
-use crate::packet::{HandshakePacket, Packet, PacketId};
-use crate::transports::{PollingTransport, WebsocketSecureTransport, WebsocketTransport};
-use crate::ENGINE_IO_VERSION;
+use crate::v4::header::HeaderMap;
+use crate::v4::packet::{HandshakePacket, Packet, PacketId};
+use crate::v4::transports::{PollingTransport, WebsocketSecureTransport, WebsocketTransport};
+use crate::v4::ENGINE_IO_VERSION;
 use bytes::Bytes;
 use native_tls::TlsConnector;
 use std::convert::TryFrom;
@@ -368,13 +368,15 @@ impl<'a> Iterator for Iter<'a> {
 #[cfg(test)]
 mod test {
 
-    use crate::packet::PacketId;
-
+    use crate::v4::packet::PacketId;
+    use reqwest::header::HOST;
+    use crate::v4::packet::Packet;
     use super::*;
+    use crate::v4::test as test_utils;
 
     #[test]
     fn test_illegal_actions() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let sut = builder(url.clone()).build()?;
 
         assert!(sut
@@ -391,9 +393,7 @@ mod test {
 
         Ok(())
     }
-    use reqwest::header::HOST;
 
-    use crate::packet::Packet;
 
     fn builder(url: Url) -> ClientBuilder {
         ClientBuilder::new(url)
@@ -444,7 +444,7 @@ mod test {
     #[test]
     fn test_connection_long() -> Result<()> {
         // Long lived socket to receive pings
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build()?;
 
         socket.connect()?;
@@ -464,56 +464,56 @@ mod test {
 
     #[test]
     fn test_connection_dynamic() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build()?;
         test_connection(socket)?;
 
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         let socket = builder(url).build()?;
         test_connection(socket)
     }
 
     #[test]
     fn test_connection_fallback() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build_with_fallback()?;
         test_connection(socket)?;
 
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         let socket = builder(url).build_with_fallback()?;
         test_connection(socket)
     }
 
     #[test]
     fn test_connection_dynamic_secure() -> Result<()> {
-        let url = crate::test::engine_io_server_secure()?;
+        let url = test_utils::engine_io_server_secure()?;
         let mut builder = builder(url);
-        builder = builder.tls_config(crate::test::tls_connector()?);
+        builder = builder.tls_config(crate::v4::test::tls_connector()?);
         let socket = builder.build()?;
         test_connection(socket)
     }
 
     #[test]
     fn test_connection_polling() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build_polling()?;
         test_connection(socket)
     }
 
     #[test]
     fn test_connection_wss() -> Result<()> {
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         assert!(builder(url).build_websocket_with_upgrade().is_err());
 
         let host =
             std::env::var("ENGINE_IO_SECURE_HOST").unwrap_or_else(|_| "localhost".to_owned());
-        let mut url = crate::test::engine_io_server_secure()?;
+        let mut url = test_utils::engine_io_server_secure()?;
 
         let mut headers = HeaderMap::default();
         headers.insert(HOST, host);
         let mut builder = builder(url.clone());
 
-        builder = builder.tls_config(crate::test::tls_connector()?);
+        builder = builder.tls_config(test_utils::tls_connector()?);
         builder = builder.headers(headers.clone());
         let socket = builder.clone().build_websocket_with_upgrade()?;
 
@@ -526,7 +526,7 @@ mod test {
         url.set_scheme("wss").unwrap();
 
         let builder = self::builder(url)
-            .tls_config(crate::test::tls_connector()?)
+            .tls_config(test_utils::tls_connector()?)
             .headers(headers);
         let socket = builder.clone().build_websocket()?;
 
@@ -539,11 +539,11 @@ mod test {
 
     #[test]
     fn test_connection_ws() -> Result<()> {
-        let url = crate::test::engine_io_polling_server()?;
+        let url = crate::v4::test::engine_io_polling_server()?;
         assert!(builder(url.clone()).build_websocket().is_err());
         assert!(builder(url).build_websocket_with_upgrade().is_err());
 
-        let mut url = crate::test::engine_io_server()?;
+        let mut url = test_utils::engine_io_server()?;
 
         let builder = builder(url.clone());
         let socket = builder.clone().build_websocket()?;
@@ -566,7 +566,7 @@ mod test {
 
     #[test]
     fn test_open_invariants() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let illegal_url = "this is illegal";
 
         assert!(Url::parse(illegal_url).is_err());

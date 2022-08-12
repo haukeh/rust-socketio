@@ -12,8 +12,9 @@ use std::{pin::Pin, sync::Arc};
 use tokio::sync::RwLock;
 use url::Url;
 
-use crate::asynchronous::generator::StreamGenerator;
-use crate::{asynchronous::transport::AsyncTransport, error::Result, Error};
+use crate::v4::asynchronous::generator::StreamGenerator;
+use crate::v4::{asynchronous::transport::AsyncTransport};
+use crate::error::{Result, Error};
 
 /// An asynchronous polling type. Makes use of the nonblocking reqwest types and
 /// methods.
@@ -159,14 +160,14 @@ impl Debug for PollingTransport {
 
 #[cfg(test)]
 mod test {
-    use crate::asynchronous::transport::AsyncTransport;
+    use crate::v4::asynchronous::transport::AsyncTransport;
 
     use super::*;
     use std::str::FromStr;
 
     #[tokio::test]
     async fn polling_transport_base_url() -> Result<()> {
-        let url = crate::test::engine_io_server()?.to_string();
+        let url = crate::v4::test::engine_io_server()?.to_string();
         let transport = PollingTransport::new(Url::from_str(&url[..]).unwrap(), None, None);
         assert_eq!(
             transport.base_url().await?.to_string(),

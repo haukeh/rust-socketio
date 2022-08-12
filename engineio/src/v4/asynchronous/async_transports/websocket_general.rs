@@ -1,6 +1,7 @@
 use std::{borrow::Cow, str::from_utf8, sync::Arc, task::Poll};
 
-use crate::{error::Result, Error, Packet, PacketId};
+use crate::v4::packet::{Packet, PacketId};
+use crate::{error::Result, error::Error};
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_util::{
     ready,

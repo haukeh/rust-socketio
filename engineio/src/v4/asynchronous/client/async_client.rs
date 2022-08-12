@@ -1,10 +1,10 @@
 use std::{fmt::Debug, pin::Pin};
 
-use crate::{
+use crate::v4::{
     asynchronous::{async_socket::Socket as InnerSocket, generator::StreamGenerator},
-    error::Result,
     Packet,
 };
+use crate::error::Result;
 use async_stream::try_stream;
 use futures_util::{Stream, StreamExt};
 
@@ -45,7 +45,7 @@ impl Client {
     /// Static method that returns a generator for each element of the stream.
     fn stream(
         socket: InnerSocket,
-    ) -> Pin<Box<impl Stream<Item = Result<Packet>> + 'static + Send>> {
+    ) -> Pin<Box<impl Stream<Item=Result<Packet>> + 'static + Send>> {
         Box::pin(try_stream! {
             for await item in socket.clone() {
                 let packet = item?;
@@ -82,17 +82,18 @@ impl Debug for Client {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
-    use crate::{asynchronous::ClientBuilder, header::HeaderMap, packet::PacketId, Error};
+    use crate::v4::{asynchronous::ClientBuilder, header::HeaderMap, packet::PacketId, Error, packet::Packet};
     use bytes::Bytes;
     use futures_util::StreamExt;
     use native_tls::TlsConnector;
     use url::Url;
+    use reqwest::header::HOST;
+    use crate::v4::test as test_utils;
 
     #[tokio::test]
     async fn test_illegal_actions() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = crate::v4::test::engine_io_server()?;
         let mut sut = builder(url.clone()).build().await?;
 
         assert!(sut
@@ -114,9 +115,6 @@ mod test {
         Ok(())
     }
 
-    use reqwest::header::HOST;
-
-    use crate::packet::Packet;
 
     fn builder(url: Url) -> ClientBuilder {
         ClientBuilder::new(url)
@@ -176,7 +174,7 @@ mod test {
     #[tokio::test]
     async fn test_connection_long() -> Result<()> {
         // Long lived socket to receive pings
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let mut socket = builder(url).build().await?;
 
         socket.connect().await?;
@@ -207,56 +205,56 @@ mod test {
 
     #[tokio::test]
     async fn test_connection_dynamic() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build().await?;
         test_connection(socket).await?;
 
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         let socket = builder(url).build().await?;
         test_connection(socket).await
     }
 
     #[tokio::test]
     async fn test_connection_fallback() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build_with_fallback().await?;
         test_connection(socket).await?;
 
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         let socket = builder(url).build_with_fallback().await?;
         test_connection(socket).await
     }
 
     #[tokio::test]
     async fn test_connection_dynamic_secure() -> Result<()> {
-        let url = crate::test::engine_io_server_secure()?;
+        let url = test_utils::engine_io_server_secure()?;
         let mut socket_builder = builder(url);
-        socket_builder = socket_builder.tls_config(crate::test::tls_connector()?);
+        socket_builder = socket_builder.tls_config(test_utils::tls_connector()?);
         let socket = socket_builder.build().await?;
         test_connection(socket).await
     }
 
     #[tokio::test]
     async fn test_connection_polling() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let socket = builder(url).build_polling().await?;
         test_connection(socket).await
     }
 
     #[tokio::test]
     async fn test_connection_wss() -> Result<()> {
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         assert!(builder(url).build_websocket_with_upgrade().await.is_err());
 
         let host =
             std::env::var("ENGINE_IO_SECURE_HOST").unwrap_or_else(|_| "localhost".to_owned());
-        let mut url = crate::test::engine_io_server_secure()?;
+        let mut url = test_utils::engine_io_server_secure()?;
 
         let mut headers = HeaderMap::default();
         headers.insert(HOST, host);
         let mut builder = builder(url.clone());
 
-        builder = builder.tls_config(crate::test::tls_connector()?);
+        builder = builder.tls_config(test_utils::tls_connector()?);
         builder = builder.headers(headers.clone());
         let socket = builder.clone().build_websocket_with_upgrade().await?;
 
@@ -269,7 +267,7 @@ mod test {
         url.set_scheme("wss").unwrap();
 
         let builder = self::builder(url)
-            .tls_config(crate::test::tls_connector()?)
+            .tls_config(test_utils::tls_connector()?)
             .headers(headers);
         let socket = builder.clone().build_websocket().await?;
 
@@ -282,11 +280,11 @@ mod test {
 
     #[tokio::test]
     async fn test_connection_ws() -> Result<()> {
-        let url = crate::test::engine_io_polling_server()?;
+        let url = test_utils::engine_io_polling_server()?;
         assert!(builder(url.clone()).build_websocket().await.is_err());
         assert!(builder(url).build_websocket_with_upgrade().await.is_err());
 
-        let mut url = crate::test::engine_io_server()?;
+        let mut url = test_utils::engine_io_server()?;
 
         let builder = builder(url.clone());
         let socket = builder.clone().build_websocket().await?;
@@ -309,7 +307,7 @@ mod test {
 
     #[tokio::test]
     async fn test_open_invariants() -> Result<()> {
-        let url = crate::test::engine_io_server()?;
+        let url = test_utils::engine_io_server()?;
         let illegal_url = "this is illegal";
 
         assert!(Url::parse(illegal_url).is_err());

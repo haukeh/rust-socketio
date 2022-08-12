@@ -1,9 +1,11 @@
 use crate::{
-    asynchronous::{
-        async_transports::WebsocketTransport as AsyncWebsocketTransport, transport::AsyncTransport,
+    v4::{
+        asynchronous::{
+            async_transports::WebsocketTransport as AsyncWebsocketTransport, transport::AsyncTransport,
+        },
+        transport::Transport,
     },
     error::Result,
-    transport::Transport,
     Error,
 };
 use bytes::Bytes;
@@ -86,11 +88,12 @@ impl std::fmt::Debug for WebsocketTransport {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ENGINE_IO_VERSION;
+    use crate::v4::ENGINE_IO_VERSION;
     use std::str::FromStr;
+    use crate::v4::test as test_utils;
 
     fn new() -> Result<WebsocketTransport> {
-        let url = crate::test::engine_io_server()?.to_string()
+        let url = test_utils::engine_io_server()?.to_string()
             + "engine.io/?EIO="
             + &ENGINE_IO_VERSION.to_string();
         WebsocketTransport::new(Url::from_str(&url[..])?, None)
@@ -99,7 +102,7 @@ mod test {
     #[test]
     fn websocket_transport_base_url() -> Result<()> {
         let transport = new()?;
-        let mut url = crate::test::engine_io_server()?;
+        let mut url = test_utils::engine_io_server()?;
         url.set_path("/engine.io/");
         url.query_pairs_mut()
             .append_pair("EIO", &ENGINE_IO_VERSION.to_string())

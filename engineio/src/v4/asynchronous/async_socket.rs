@@ -2,8 +2,8 @@ use std::{
     fmt::Debug,
     pin::Pin,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -12,11 +12,11 @@ use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use tokio::{runtime::Handle, sync::Mutex, time::Instant};
 
-use crate::{
+use crate::error::{Error, Result};
+
+use crate::v4::{
     asynchronous::{callback::OptionalCallback, transport::AsyncTransportType},
-    error::Result,
-    packet::{HandshakePacket, Payload},
-    Error, Packet, PacketId,
+    packet::{HandshakePacket, Payload}, Packet, PacketId,
 };
 
 use super::generator::StreamGenerator;
@@ -115,7 +115,7 @@ impl Socket {
     }
 
     /// Helper method that parses bytes and returns an iterator over the elements.
-    fn parse_payload(bytes: Bytes) -> impl Stream<Item = Result<Packet>> {
+    fn parse_payload(bytes: Bytes) -> impl Stream<Item=Result<Packet>> {
         try_stream! {
             let payload = Payload::try_from(bytes);
 
@@ -129,7 +129,7 @@ impl Socket {
     /// underlying transport types.
     fn stream(
         mut transport: AsyncTransportType,
-    ) -> Pin<Box<impl Stream<Item = Result<Packet>> + 'static + Send>> {
+    ) -> Pin<Box<impl Stream<Item=Result<Packet>> + 'static + Send>> {
         // map the byte stream of the underlying transport
         // to a packet stream
         Box::pin(try_stream! {

@@ -107,6 +107,9 @@ pub use client::{Client, ClientBuilder, TransportType};
 #[deprecated(since = "0.3.0-alpha-2", note = "Socket renamed to Client")]
 pub use client::{Client as Socket, ClientBuilder as SocketBuilder};
 
+#[cfg(all(feature = "v5", feature = "v4"))]
+compile_error!("You can only enable either version 5 or version 4 of socket.io at a time.");
+
 #[cfg(test)]
 pub(crate) mod test {
     use url::Url;
