@@ -19,11 +19,16 @@ mod common;
 #[cfg(feature = "v4")]
 mod v4;
 #[cfg(feature = "v4")]
+pub use v4::asynchronous;
+#[cfg(feature = "v4")]
 pub use v4::client::{Client, ClientBuilder};
 #[cfg(feature = "v4")]
 pub use v4::packet::{Packet, PacketId};
 #[cfg(feature = "v4")]
 pub use common::header::{HeaderMap, HeaderValue};
+
+#[cfg(feature = "v3")]
+mod v3;
 
 /// Contains the error type which will be returned with every result in this
 /// crate. Handles all kinds of errors.

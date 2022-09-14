@@ -1,19 +1,22 @@
+use std::sync::Arc;
+
+use bytes::Bytes;
+use futures_util::StreamExt;
+use http::HeaderMap;
+use tokio::{runtime::Runtime, sync::Mutex};
+use url::Url;
+
 use crate::{
+    Error,
+    error::Result,
     v4::{
         asynchronous::{
             async_transports::WebsocketTransport as AsyncWebsocketTransport, transport::AsyncTransport,
         },
-        transport::Transport,
     },
-    error::Result,
-    Error,
 };
-use bytes::Bytes;
-use futures_util::StreamExt;
-use http::HeaderMap;
-use std::sync::Arc;
-use tokio::{runtime::Runtime, sync::Mutex};
-use url::Url;
+use crate::common::transport::{PollingResponse, Transport};
+use crate::common::transport::ContentType::Binary;
 
 #[derive(Clone)]
 pub struct WebsocketTransport {
@@ -54,10 +57,11 @@ impl Transport for WebsocketTransport {
         })
     }
 
-    fn poll(&self) -> Result<Bytes> {
+    fn poll(&self) -> Result<PollingResponse> {
         self.runtime.block_on(async {
             let mut lock = self.inner.lock().await;
-            lock.next().await.ok_or(Error::IncompletePacket())?
+            let res = lock.next().await.ok_or(Error::IncompletePacket())?;
+            res.map(|b| PollingResponse { content_type: Binary, data: b })
         })
     }
 
@@ -87,10 +91,12 @@ impl std::fmt::Debug for WebsocketTransport {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::v4::ENGINE_IO_VERSION;
     use std::str::FromStr;
+
+    use crate::v4::ENGINE_IO_VERSION;
     use crate::v4::test as test_utils;
+
+    use super::*;
 
     fn new() -> Result<WebsocketTransport> {
         let url = test_utils::engine_io_server()?.to_string()

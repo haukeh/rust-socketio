@@ -103,19 +103,18 @@ impl TryFrom<Bytes> for Packet {
     /// Decodes a single `Packet` from an `u8` byte stream.
     fn try_from(
         bytes: Bytes,
-    ) -> std::result::Result<Self, <Self as TryFrom<Bytes>>::Error> {
-
+    ) -> std::result::Result<Self, <Self as std::convert::TryFrom<Bytes>>::Error> {
         if bytes.is_empty() {
             return Err(Error::IncompletePacket());
         }
 
-        let is_base64 = *bytes.first().ok_or(Error::IncompletePacket())? == b'b';
+        let is_base64 = *bytes.get(0).ok_or(Error::IncompletePacket())? == b'b';
 
         // only 'messages' packets could be encoded
         let packet_id = if is_base64 {
             PacketId::MessageBinary
         } else {
-            (*bytes.first().ok_or(Error::IncompletePacket())? as u8).try_into()?
+            (*bytes.get(0).ok_or(Error::IncompletePacket())? as u8).try_into()?
         };
 
         if bytes.len() == 1 && packet_id == PacketId::Message {
@@ -127,7 +126,7 @@ impl TryFrom<Bytes> for Packet {
         Ok(Packet {
             packet_id,
             data: if is_base64 {
-                Bytes::from(decode(data.as_ref())?)
+                Bytes::from(base64::decode(data.as_ref())?)
             } else {
                 data
             },
@@ -162,24 +161,33 @@ impl Payload {
     }
 }
 
-impl TryFrom<Bytes> for Payload {
+impl TryFrom<PollingResponse> for Payload {
     type Error = Error;
     /// Decodes a `payload` which in the `engine.io` context means a chain of normal
-    /// packets separated by a certain SEPARATOR, in this case the delimiter `\x30`.
-    fn try_from(payload: Bytes) -> Result<Self> {
+    /// packets separated by a certain SEPARATOR, in this case the delimiter `\x1e`.
+    fn try_from(response: PollingResponse) -> Result<Self> {
         let mut vec = Vec::new();
         let mut last_index = 0;
 
-        for i in 0..payload.len() {
-            if *payload.get(i).unwrap() as char == Self::SEPARATOR {
-                vec.push(Packet::try_from(payload.slice(last_index..i))?);
-                last_index = i + 1;
+        match response.content_type {
+            ContentType::Binary => {
+                let is_str_payload = (*response.data.get(0).unwrap() & 0xFF) == 0;
             }
+            ContentType::String => {}
         }
-        // push the last packet as well
-        vec.push(Packet::try_from(payload.slice(last_index..payload.len()))?);
 
-        Ok(Payload(vec))
+
+        // for i in 0..payload.len() {
+        //     if *payload.get(i).unwrap() as char == Self::SEPARATOR {
+        //         vec.push(Packet::try_from(payload.slice(last_index..i))?);
+        //         last_index = i + 1;
+        //     }
+        // }
+        // // push the last packet as well
+        // vec.push(Packet::try_from(payload.slice(last_index..payload.len()))?);
+        //
+        // Ok(Payload(vec))
+        todo!()
     }
 }
 

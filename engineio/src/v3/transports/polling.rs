@@ -1,18 +1,17 @@
-use std::sync::{Arc, Mutex, RwLock};
-
+use crate::error::{Error, Result};
+use crate::common::transport::{PollingResponse, Transport};
 use bytes::{BufMut, Bytes, BytesMut};
-use http;
-use http::header::CONTENT_TYPE;
 use native_tls::TlsConnector;
 use reqwest::{
     blocking::{Client, ClientBuilder},
     header::HeaderMap,
 };
+use std::sync::{Arc, Mutex, RwLock};
+use http::header::CONTENT_TYPE;
 use url::Url;
-
-use crate::common::transport::{ContentType, PollingResponse, Transport};
-use crate::common::transport;
-use crate::error::{Error, Result};
+use http;
+use crate::common::transport::ContentType::Binary;
+use crate::v3::packet::Payload;
 
 #[derive(Debug, Clone)]
 pub struct PollingTransport {
@@ -86,8 +85,8 @@ impl Transport for PollingTransport {
     fn poll(&self) -> Result<PollingResponse> {
         let response = self.client.lock()?.get(self.address()?).send()?;
         let content_type = match response.headers().get(CONTENT_TYPE) {
-            Some(hv) if hv == transport::APPLICATION_OCTET_STREAM => ContentType::Binary,
-            _ => ContentType::String
+            Some(hv) if hv == APPLICATION_OCTET_STREAM => Binary,
+            _ => String
         };
 
         let data = response.bytes()?;
@@ -114,11 +113,9 @@ impl Transport for PollingTransport {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use crate::v4::test as test_utils;
-
     use super::*;
+    use std::str::FromStr;
+    use crate::v4::test as test_utils;
 
     #[test]
     fn polling_transport_base_url() -> Result<()> {

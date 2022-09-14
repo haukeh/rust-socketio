@@ -15,8 +15,7 @@ use native_tls::TlsConnector;
 use std::sync::Arc;
 use tokio::{runtime::Runtime, sync::Mutex};
 use url::Url;
-use crate::common::transport::{PollingResponse, Transport};
-use crate::common::transport::ContentType::Binary;
+use crate::common::transport::Transport;
 
 #[derive(Clone)]
 pub struct WebsocketSecureTransport {
@@ -63,11 +62,10 @@ impl Transport for WebsocketSecureTransport {
         })
     }
 
-    fn poll(&self) -> Result<PollingResponse> {
+    fn poll(&self) -> Result<Bytes> {
         self.runtime.block_on(async {
             let mut lock = self.inner.lock().await;
-            let res = lock.next().await.ok_or(Error::IncompletePacket())?;
-            res.map(|b| PollingResponse { content_type: Binary, data: b })
+            lock.next().await.ok_or(Error::IncompletePacket())?
         })
     }
 

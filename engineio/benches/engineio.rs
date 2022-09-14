@@ -40,7 +40,7 @@ pub mod util {
     }
 }
 
-/// sync benches
+// sync benches
 
 #[cfg(not(feature = "async"))]
 pub mod tests {

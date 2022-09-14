@@ -1,6 +1,6 @@
-use super::super::socket::Socket as InnerSocket;
+use super::socket::Socket as InnerSocket;
 use crate::v4::callback::OptionalCallback;
-use crate::v4::transport::Transport;
+use crate::common::transport::{PollingResponse, Transport};
 
 use crate::error::{Error, Result};
 use crate::common::header::HeaderMap;
@@ -69,8 +69,8 @@ impl ClientBuilder {
 
     /// Registers the `on_close` callback.
     pub fn on_close<T>(mut self, callback: T) -> Self
-    where
-        T: Fn(()) + 'static + Sync + Send,
+        where
+            T: Fn(()) + 'static + Sync + Send,
     {
         self.on_close = OptionalCallback::new(callback);
         self
@@ -78,8 +78,8 @@ impl ClientBuilder {
 
     /// Registers the `on_data` callback.
     pub fn on_data<T>(mut self, callback: T) -> Self
-    where
-        T: Fn(Bytes) + 'static + Sync + Send,
+        where
+            T: Fn(Bytes) + 'static + Sync + Send,
     {
         self.on_data = OptionalCallback::new(callback);
         self
@@ -87,8 +87,8 @@ impl ClientBuilder {
 
     /// Registers the `on_error` callback.
     pub fn on_error<T>(mut self, callback: T) -> Self
-    where
-        T: Fn(String) + 'static + Sync + Send,
+        where
+            T: Fn(String) + 'static + Sync + Send,
     {
         self.on_error = OptionalCallback::new(callback);
         self
@@ -96,8 +96,8 @@ impl ClientBuilder {
 
     /// Registers the `on_open` callback.
     pub fn on_open<T>(mut self, callback: T) -> Self
-    where
-        T: Fn(()) + 'static + Sync + Send,
+        where
+            T: Fn(()) + 'static + Sync + Send,
     {
         self.on_open = OptionalCallback::new(callback);
         self
@@ -105,8 +105,8 @@ impl ClientBuilder {
 
     /// Registers the `on_packet` callback.
     pub fn on_packet<T>(mut self, callback: T) -> Self
-    where
-        T: Fn(Packet) + 'static + Sync + Send,
+        where
+            T: Fn(Packet) + 'static + Sync + Send,
     {
         self.on_packet = OptionalCallback::new(callback);
         self
@@ -121,7 +121,8 @@ impl ClientBuilder {
 
         let mut url = self.url.clone();
 
-        let handshake: HandshakePacket = Packet::try_from(transport.poll()?)?.try_into()?;
+        let PollingResponse { data, .. } = transport.poll()?;
+        let handshake: HandshakePacket = Packet::try_from(data)?.try_into()?;
 
         // update the base_url with the new sid
         url.query_pairs_mut().append_pair("sid", &handshake.sid[..]);
@@ -198,7 +199,7 @@ impl ClientBuilder {
     /// Build socket with only a websocket transport
     pub fn build_websocket(mut self) -> Result<Client> {
         // SAFETY: Already a Url
-        let url = url::Url::parse(&self.url.to_string())?;
+        let url = url::Url::parse(self.url.as_ref())?;
 
         let headers: Option<http::HeaderMap> = if let Some(map) = self.headers.clone() {
             Some(map.try_into()?)

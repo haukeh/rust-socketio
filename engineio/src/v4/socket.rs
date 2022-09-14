@@ -1,16 +1,17 @@
-use crate::v4::callback::OptionalCallback;
-use crate::v4::transport::TransportType;
-
-use crate::error::{Error, Result};
-use crate::v4::packet::{HandshakePacket, Packet, PacketId, Payload};
-use bytes::Bytes;
-use std::convert::TryFrom;
-use std::sync::RwLock;
 use std::{fmt::Debug, sync::atomic::Ordering};
 use std::{
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{Arc, atomic::AtomicBool, Mutex, RwLock},
     time::Instant,
 };
+use std::convert::TryFrom;
+
+use bytes::Bytes;
+
+use crate::common::transport::PollingResponse;
+use crate::error::{Error, Result};
+use crate::v4::callback::OptionalCallback;
+use crate::v4::packet::{HandshakePacket, Packet, PacketId, Payload};
+use crate::v4::transport_type::TransportType;
 
 /// An `engine.io` socket which manages a connection with the server and allows
 /// it to register common callbacks.
@@ -127,7 +128,7 @@ impl Socket {
 
                 // Iterator has run out of packets, get a new payload
                 // TODO: 0.3.X timeout?
-                let data = self.transport.as_transport().poll()?;
+                let PollingResponse { data, .. } = self.transport.as_transport().poll()?;
 
                 if data.is_empty() {
                     continue;
